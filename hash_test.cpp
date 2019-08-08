@@ -1,59 +1,47 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include <string.h>
 #include <iostream>
-#include <map>
-#include <string>
 
 #define TOTAL_TEST_CASE 100
-
-#define MAX_TABLE 300 // 테이블 크기
-#define MAX_KEY 8 // include null
-#define MAX_DATA 2000 // 해시테이블에 넣을 데이터의 수
-#define DELETE_COUNT 1000 // 삭제할 데이터의 수
-
+#define MAX_NODE 100000 // 노드 수
+#define MAX_TABLE 10000
 using namespace std;
 
-struct Node {
-	char key[MAX_KEY];
-	int value;
-	Node * next;
-};
+int node_idx = 0;
+struct NODE {
+	char key[7];
+	char val[7];
+	NODE * next;
+}node[MAX_NODE];
 
-Node * tb[MAX_TABLE]; // 해시 테이블(해당 인덱스에 리스트로 작성)
-char keys[MAX_DATA][MAX_KEY]; // 문자열 key들
-int values[MAX_DATA]; // key에 대응하는 값들
+NODE* myalloc(void)
+{
+	return &node[node_idx++];
+}
+
+NODE *hTable[MAX_TABLE];  //Hash Table 입니다.
+
+unsigned long myhash(const char *str)
+{
+	//unsigned long hash = 50021;
+	unsigned long hash = 5381;
+	int c;
+
+	while(c = *str++)
+	{
+		hash = (((hash << 5) + hash) + c) % MAX_TABLE;
+	}
+	return hash % MAX_TABLE;
+}
 
 void init() {
 
+ 	node_idx = 0;	// NODE 초기화
+	
 	// 해시테이블 초기화
 	for (int i = 0; i < MAX_TABLE; ++i) {
-		Node * cur = tb[i];
-		Node * tmp;
-		while (cur != NULL) {
-			tmp = cur;
-			cur = cur->next;
-			free(tmp);
-		}
-		tb[i] = NULL;
-	}
-
-	// 랜덤함수를 위한 srand와 seed
-	srand(time(NULL));
-
-	// key에 대응하는 값들 초기화
-	for (int i = 0; i < MAX_DATA; ++i) {
-		values[i] = rand() % 100 + 1;
-	}
-
-	// 문자열 key들 초기화
-	for (int i = 0; i < MAX_DATA; ++i) {
-		for (int j = 0; j < MAX_KEY - 1; ++j) {
-			keys[i][j] = rand() % 26 + 97; // ASCII 97 ~ 122
-		}
-		keys[i][MAX_KEY - 1] = '\0';
-	}
-
+		hTable[i] = NULL;
+	}	
 }
 
 void my_str_cpy(char * dest, const char * src) {
@@ -76,193 +64,58 @@ int my_str_cmp(const char * str1, const char * str2) {
 
 }
 
-int my_hash(const char * str) {
-	int hash = 401;
+void add(const char * key, char* value) {
 
-	while (*str != '\0') {
-		hash = ((hash << 4) + (int)(*str)) % MAX_TABLE;
-		str++;
-	}
-
-	return hash % MAX_TABLE;
-}
-
-void add(const char * key, int value) {
-
-	Node * new_node = (Node *)malloc(sizeof(Node));
-	my_str_cpy(new_node->key, key);
-	new_node->value = value;
-	new_node->next = NULL;
-
-	int index = my_hash(key);
-
-	// 처음이 비어있으면 할당
-	if (tb[index] == NULL) {
-		tb[index] = new_node;
-	}
-	// 아니면 하나하나 찾아서 중복이면 치환 아니면 제일 뒤에 추가
-	else {
-
-		Node * cur = tb[index];
-
-		while (cur != NULL) {
-
-			// key가 중복이면 값을 바꾸기
-			if (my_str_cmp(cur->key, key) == 0) {
-				cur->value = value;
-				return;
-			}
-
-			cur = cur->next;
+	int idx = myhash(key);
+	NODE* n = myalloc();
+	NODE* cur = hTable[idx];
+	while(cur != NULL){
+		// 중복이면 값 변경 후 return
+		if(my_str_cmp(cur->key, key) == 0) {
+			my_str_cpy(cur->val, value);
+			return;
 		}
-		// 중복이 아니면 앞에다가 추가
-		new_node->next = tb[index];
-		tb[index] = new_node;
+		cur = cur->next;
 	}
+	n->next = hTable[idx];
+	hTable[idx] = n;
 }
 
 bool find(const char * key, int * val) {
 
-	int index = my_hash(key);
-
-	Node * cur = tb[index];
-
-	// 하나하나 찾아가면서 확인
-	while (cur != NULL) {
-		if (my_str_cmp(cur->key, key) == 0) {
-			*val = cur->value;
-			return true;
-		}
-		cur = cur->next;
-	}
 
 	return false;
 
 }
 
 bool destroy(const char * key) {
-
-	int index = my_hash(key);
-
-	// 처음이 비어있는지 확인
-	if (tb[index] == NULL) {
+	int idx = myhash(key);
+	if(hTable[idx] == NULL)
 		return false;
-	}
 
-	// 첫번째
-	if (my_str_cmp(tb[index]->key, key) == 0) {
-		Node * first = tb[index];
-		tb[index] = tb[index]->next;
-		free(first);
-		return true;
-	}
-
-	// 나머지의 경우
-	else {
-
-		Node * cur = tb[index]->next;
-		Node * prev = tb[index];
-
-		while (cur != NULL && my_str_cmp(cur->key, key) != 0) {
-			prev = cur;
-			cur = cur->next;
+	NODE** cur = &hTable[idx];
+	while(*cur != NULL){
+		// key가 같으면 출력 후 삭제
+		if(my_str_cmp((*cur)->key, key) == 0) {
+			printf("key: %s, value: %s\n", (*cur)->key, (*cur)->val);
+			*cur = (*cur)->next;
+			return true;
 		}
-
-		if (cur == NULL) return false;
-
-		prev->next = cur->next;
-		free(cur);
-		return true;
 	}
+	return true;
 }
 
 void print_hash() {
-
-	for (int i = 0; i < MAX_TABLE; ++i) {
-		if (tb[i] != NULL) {
-
-			printf("index : %d\n", i);
-
-			Node * cur = tb[i];
-
-			while (cur != NULL) {
-				printf("{ %s, %d }, ", cur->key, cur->value);
-				cur = cur->next;
-			}
-			printf("\n");
-		}
-	}
 
 }
 
 int main() {
 
-	int test_case = 1;
-	int correct = 0;
+	int key;
+    char key[7] = "aaaaaa"; 
+	char value[10] = "hjlee98";
 
-
-	for (test_case = 1; test_case <= TOTAL_TEST_CASE; ++test_case) {
-
-		init();
-
-		bool is_equal = true;
-
-		map<string, int> m;
-		map<string, int>::iterator it;
-
-
-		for (int i = 0; i < MAX_DATA; ++i) {
-			add(keys[i], values[i]);
-		}
-		for (int i = 0; i < MAX_DATA; ++i) {
-			if (m.count(keys[i]) == 0) {
-				m.insert(make_pair(keys[i], values[i]));
-			}
-			else {
-				m[keys[i]] = values[i];
-			}
-
-		}
-
-		for (int i = 0; i < MAX_DATA; ++i) {
-
-			int tmp;
-			find(keys[i], &tmp);
-
-			if (m[keys[i]] != tmp) {
-				is_equal = false;
-			}
-		}
-
-		char tmp_key[MAX_KEY];
-		for (int i = 0; i < DELETE_COUNT; ++i) {
-			my_str_cpy(tmp_key, keys[rand() % MAX_DATA]);
-			destroy(tmp_key);
-			m.erase(tmp_key);
-		}
-
-		for (int i = 0; i < MAX_DATA; ++i) {
-
-			int tmp = -1;
-
-			if (find(keys[i], &tmp) == false && m.count(keys[i]) == 0) {
-				continue;
-			}
-
-			if (find(keys[i], &tmp) == true && m.count(keys[i]) == 1 && m[keys[i]] == tmp) {
-				continue;
-			}
-			else {
-				is_equal = false;
-			}
-
-		}
-
-		if (is_equal) correct++;
-
-	}
-
-	printf("Total : %d / %d\n", correct, TOTAL_TEST_CASE);
+	add(key, value);
 
 	return 0;
 }
